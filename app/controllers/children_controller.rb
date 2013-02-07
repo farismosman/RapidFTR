@@ -91,7 +91,7 @@ class ChildrenController < ApplicationController
     authorize! :create, Child
     params[:child] = JSON.parse(params[:child]) if params[:child].is_a?(String)
     params[:child][:photo] = params[:current_photo_key] unless params[:current_photo_key].nil?
-    @child = Child.new_with_user_name(current_user, params[:child])
+    create_or_update_child
     @child['created_by_full_name'] = current_user_full_name
     respond_to do |format|
       if @child.save
@@ -244,6 +244,15 @@ class ChildrenController < ApplicationController
 
   private
 
+  def create_or_update_child
+    @child = Child.by_short_id(:key => params[:child][:short_id]).first
+    if @child.nil?
+      @child = Child.new_with_user_name(current_user, params[:child])
+    else
+      @child = update_child_from(params)
+    end
+  end
+
     def file_basename(child = nil)
       prefix = child.nil? ? current_user_name : child.short_id
       user = User.find_by_user_name(current_user_name)
@@ -281,7 +290,7 @@ class ChildrenController < ApplicationController
       results = results || [] # previous version handled nils - needed?
 
       results.each do |child|
-        child['photo_url'] = child_photo_url(child, child.primary_photo_id) unless child.primary_photo_id.nil?
+        child['photo_url'] = child_photo_url(child, child.primary_photo_id) unless (child.primary_photo_id.nil? || child.primary_photo_id == "")
         child['audio_url'] = child_audio_url(child)
       end
 
@@ -318,7 +327,7 @@ class ChildrenController < ApplicationController
       if can? :view_all, Child
         return Child.view(:by_all_view, :startkey => [filter_option], :endkey => [filter_option, {}])
       else
-        return Child.view(:by_all_view, :startkey => [filter_option, app_session.user_name], :endkey => [filter_option, app_session.user_name])
+        return Child.view(:by_all_view, :startkey => [filter_option, current_user_name], :endkey => [filter_option, current_user_name])
       end
     end
 
@@ -333,14 +342,13 @@ class ChildrenController < ApplicationController
       if can? :view_all, Child
         @results = Child.search(@search)
       else
-        @results = Child.search_by_created_user(@search, app_session.user_name)
+        @results = Child.search_by_created_user(@search, current_user_name)
       end
     end
 
     def update_child_from params
-      child = Child.get(params[:id]) || Child.new_with_user_name(current_user, params[:child])
+      child = @child || Child.get(params[:id]) || Child.new_with_user_name(current_user, params[:child])
       authorize! :update, child
-
       child['last_updated_by_full_name'] = current_user_full_name
       new_photo = params[:child].delete("photo")
       new_photo = (params[:current_photo_key] || "") if new_photo.nil?

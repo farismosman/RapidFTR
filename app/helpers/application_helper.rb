@@ -1,22 +1,12 @@
 # Methods added to this helper will be available to all templates in the application.
 module ApplicationHelper
-  include LoadsSession
 
   def current_url_with_format_of( format )
     url_for( params.merge( 'format' => format, 'escape' => false ) )
   end
 
-  # TODO Remove duplication in ApplicationController
-  def current_user_name
-    return current_user.try(:user_name)
-  end
-
   def session
-    get_session
-  end
-
-  def current_user
-    session.try(:user)
+    current_session
   end
 
   def submit_button(name = t("buttons.save"))
@@ -47,7 +37,7 @@ module ApplicationHelper
 
   def link_confirm_options(controller)
     confirm_options = { }
-    confirm_message = t('confirmation_message')
+    confirm_message = t('messages.confirmation_message')
     if /children/.match(controller.controller_name) and /edit|new/.match(controller.action_name)
       confirm_options[:confirm] = confirm_message % 'Child Record'
     elsif /user/.match(controller.controller_name) and /edit|new/.match(controller.action_name)
